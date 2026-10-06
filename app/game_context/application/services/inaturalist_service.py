@@ -31,6 +31,7 @@ class GameAveOption(BaseModel):
     """Opción para una pregunta del juego"""
     id: int
     nombre: str
+    nombreCientifico: str
 
 
 class GameAveQuestion(BaseModel):
@@ -81,8 +82,8 @@ class INaturalistService:
         else:
             aves_falsas = random.sample(aves_disponibles, 3)
 
-        opciones = [GameAveOption(id=ave_correcta.id, nombre=ave_correcta.nombre)]
-        opciones.extend([GameAveOption(id=a.id, nombre=a.nombre) for a in aves_falsas])
+        opciones = [GameAveOption(id=ave_correcta.id, nombre=ave_correcta.nombre, nombreCientifico=ave_correcta.nombreCientifico)]
+        opciones.extend([GameAveOption(id=a.id, nombre=a.nombre, nombreCientifico=a.nombreCientifico) for a in aves_falsas])
 
         random.shuffle(opciones)
         return opciones

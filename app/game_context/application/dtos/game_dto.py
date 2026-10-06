@@ -5,6 +5,7 @@ from pydantic import BaseModel
 class GameAveOption(BaseModel):
     id: int
     nombre: str
+    nombreCientifico: str
 
 
 class GameAveQuestion(BaseModel):

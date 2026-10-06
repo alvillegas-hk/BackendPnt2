@@ -165,7 +165,7 @@ async def get_birds_for_game(
     - nombreCientifico: Nombre científico
     - foto: URL de imagen
     - atribucion: Crédito fotográfico
-    - opciones: Lista de 4 opciones (nombre e id)
+    - opciones: Lista de 4 opciones (id, nombre, nombreCientifico)
 
     Parámetros:
     - **place_id**: 10434 (Buenos Aires) o 7190 (Argentina)
