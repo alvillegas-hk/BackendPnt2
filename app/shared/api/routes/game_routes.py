@@ -1,16 +1,16 @@
 from fastapi import APIRouter, Query, HTTPException, status, Depends
 from sqlalchemy.orm import Session
 
-from app.application.services.inaturalist_service import (
+from app.game_context.application.services.inaturalist_service import (
     INaturalistService,
     BirdsResponse,
     AvesResponse,
     GameAveResponse
 )
-from app.application.services.game_result_service import GameResultService
-from app.application.services.game_session_service import GameSessionService
-from app.application.services.metrics_service import MetricsService
-from app.application.dtos.game_dto import (
+from app.game_context.application.services.game_result_service import GameResultService
+from app.game_context.application.services.game_session_service import GameSessionService
+from app.analytics_context.application.services.metrics_service import MetricsService
+from app.game_context.application.dtos.game_dto import (
     RespuestaJugadorRequest,
     RespuestaJugadorResponse,
     RankingResponse,
@@ -19,12 +19,12 @@ from app.application.dtos.game_dto import (
     TerminarSesionResponse,
     EstadisticasSesionResponse
 )
-from app.application.dtos.metrics_dto import (
+from app.analytics_context.application.dtos.metrics_dto import (
     MetricasUsuarioResponse,
     MetricasGlobalResponse
 )
-from app.api.dependencies import get_current_user_model, get_db, get_admin_or_moderator
-from app.infrastructure.database.models import UserModel
+from app.shared.api.dependencies import get_current_user_model, get_db, get_admin_or_moderator
+from app.shared.infrastructure.database.models import UserModel
 
 import logging
 

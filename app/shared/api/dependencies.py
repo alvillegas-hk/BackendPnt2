@@ -2,14 +2,14 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from starlette.requests import Request
 from sqlalchemy.orm import Session
-from app.infrastructure.database.database import get_db
+from app.shared.infrastructure.database.database import get_db
 from app.infrastructure.config.settings import get_settings
 from app.infrastructure.security.jwt_handler import decode_token
-from app.domain.repositories.user_repository import UserRepository
-from app.infrastructure.repositories.user_repository_impl import UserRepositoryImpl
-from app.application.services.auth_service import AuthService
-from app.application.services.user_service import UserService
-from app.infrastructure.database.models import UserModel
+from app.authentication_context.domain.repositories.user_repository import UserRepository
+from app.authentication_context.infrastructure.repositories.user_repository_impl import UserRepositoryImpl
+from app.authentication_context.application.services.auth_service import AuthService
+from app.authentication_context.application.services.user_service import UserService
+from app.shared.infrastructure.database.models import UserModel
 
 
 def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:

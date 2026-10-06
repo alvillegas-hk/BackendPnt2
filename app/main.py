@@ -5,9 +5,9 @@ from fastapi.openapi.utils import get_openapi
 from scalar_fastapi import get_scalar_api_reference
 import logging
 from app.infrastructure.config.settings import get_settings
-from app.infrastructure.database.database import engine
-from app.infrastructure.database.models import Base
-from app.api.routes import auth, users, inaturalist
+from app.shared.infrastructure.database.database import engine
+from app.shared.infrastructure.database.models import Base
+from app.shared.api.routes import auth_routes, users_routes, game_routes
 
 settings = get_settings()
 
@@ -61,9 +61,9 @@ app.add_middleware(
 
 Base.metadata.create_all(bind=engine)
 
-app.include_router(auth.router)
-app.include_router(users.router)
-app.include_router(inaturalist.router)
+app.include_router(auth_routes.router, tags=["Authentication"])
+app.include_router(users_routes.router, tags=["Users"])
+app.include_router(game_routes.router, tags=["Game & Analytics"])
 
 
 @app.get("/", tags=["health"])
