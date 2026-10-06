@@ -61,9 +61,9 @@ app.add_middleware(
 
 Base.metadata.create_all(bind=engine)
 
-app.include_router(auth_routes.router, tags=["Authentication"])
-app.include_router(users_routes.router, tags=["Users"])
-app.include_router(game_routes.router, tags=["Game & Analytics"])
+app.include_router(auth_routes.router)
+app.include_router(users_routes.router)
+app.include_router(game_routes.router)
 
 
 @app.get("/", tags=["health"])
