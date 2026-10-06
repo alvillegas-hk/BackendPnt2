@@ -34,6 +34,8 @@ class GameSessionService:
                 puntos_totales=0,
                 total_intentos=0,
                 total_aciertos=0,
+                streak_actual=0,
+                streak_maximo=0,
                 estado="activa",
                 createdAt=timestamp
             )

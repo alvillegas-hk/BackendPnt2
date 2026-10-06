@@ -228,7 +228,28 @@ async def validar_respuesta(
             request.ave_nombre
         )
 
-        # Guardar resultado con session_id
+        # Actualizar racha y calcular bonus
+        bonus_racha = 0
+        if es_correcta:
+            sesion_activa.streak_actual += 1
+            if sesion_activa.streak_actual > sesion_activa.streak_maximo:
+                sesion_activa.streak_maximo = sesion_activa.streak_actual
+
+            # Calcular bonus por racha
+            if sesion_activa.streak_actual == 3:
+                bonus_racha = 5
+            elif sesion_activa.streak_actual == 5:
+                bonus_racha = 15
+            elif sesion_activa.streak_actual >= 10:
+                bonus_racha = 50
+        else:
+            # Resetear racha si falla
+            sesion_activa.streak_actual = 0
+
+        # Marcar sesión como modificada (se guarda al guardar resultado)
+        db.add(sesion_activa)
+
+        # Guardar resultado con session_id, racha y bonus
         GameResultService.guardar_resultado(
             db=db,
             user_id=current_user.id,
@@ -237,14 +258,25 @@ async def validar_respuesta(
             respuesta_usuario=request.respuesta_usuario,
             es_correcta=es_correcta,
             puntos_obtenidos=puntos,
-            session_id=sesion_activa.id
+            session_id=sesion_activa.id,
+            streak=sesion_activa.streak_actual,
+            bonus_racha=bonus_racha
         )
 
+        puntos_totales = puntos + bonus_racha
         mensaje = "¡Correcto! ✓" if es_correcta else "Incorrecto. ✗"
+
+        if bonus_racha > 0:
+            if sesion_activa.streak_actual == 3:
+                mensaje += f" 🔥 ¡Racha de 3! +{bonus_racha} pts bonus"
+            elif sesion_activa.streak_actual == 5:
+                mensaje += f" 🔥🔥 ¡Racha de 5! +{bonus_racha} pts bonus"
+            elif sesion_activa.streak_actual >= 10:
+                mensaje += f" 🔥🔥🔥 ¡RACHA ÉPICA! +{bonus_racha} pts bonus"
 
         return RespuestaJugadorResponse(
             es_correcta=es_correcta,
-            puntos_obtenidos=puntos,
+            puntos_obtenidos=puntos_totales,
             mensaje=mensaje
         )
 

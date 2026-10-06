@@ -49,6 +49,8 @@ class GameResultModel(Base):
     respuesta_usuario = Column(String(255), nullable=False)
     es_correcta = Column(Boolean, nullable=False)
     puntos_obtenidos = Column(Integer, nullable=False, default=0)
+    bonus_racha = Column(Integer, nullable=False, default=0)
+    streak_en_respuesta = Column(Integer, nullable=False, default=0)
     createdAt = Column(Integer, nullable=False)
 
     user = relationship("UserModel", back_populates="game_results")
@@ -63,7 +65,9 @@ class GameSessionModel(Base):
     puntos_totales = Column(Integer, nullable=False, default=0)
     total_intentos = Column(Integer, nullable=False, default=0)
     total_aciertos = Column(Integer, nullable=False, default=0)
-    estado = Column(String(50), nullable=False, default="activa")  # activa, terminada
+    streak_actual = Column(Integer, nullable=False, default=0)
+    streak_maximo = Column(Integer, nullable=False, default=0)
+    estado = Column(String(50), nullable=False, default="activa")
     createdAt = Column(Integer, nullable=False)
     terminadaAt = Column(Integer, nullable=True)
 

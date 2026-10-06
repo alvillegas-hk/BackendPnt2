@@ -23,7 +23,9 @@ class GameResultService:
         respuesta_usuario: str,
         es_correcta: bool,
         puntos_obtenidos: int,
-        session_id: str = None
+        session_id: str = None,
+        streak: int = 0,
+        bonus_racha: int = 0
     ) -> GameResult:
         """
         Guarda un resultado del juego en la base de datos.
@@ -36,6 +38,9 @@ class GameResultService:
             respuesta_usuario: Respuesta del usuario
             es_correcta: Si la respuesta fue correcta
             puntos_obtenidos: Puntos obtenidos
+            session_id: ID de la sesión
+            streak: Racha de respuestas correctas consecutivas
+            bonus_racha: Puntos bonus por racha
 
         Returns:
             GameResult guardado
@@ -53,6 +58,8 @@ class GameResultService:
                 respuesta_usuario=respuesta_usuario,
                 es_correcta=es_correcta,
                 puntos_obtenidos=puntos_obtenidos,
+                bonus_racha=bonus_racha,
+                streak_en_respuesta=streak,
                 createdAt=timestamp
             )
 
