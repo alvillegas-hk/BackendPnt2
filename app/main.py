@@ -1,12 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.openapi.utils import get_openapi
 from scalar_fastapi import get_scalar_api_reference
 import logging
 from app.infrastructure.config.settings import get_settings
 from app.infrastructure.database.database import engine
 from app.infrastructure.database.models import Base
-from app.api.routes import auth, users
+from app.api.routes import auth, users, inaturalist
 
 settings = get_settings()
 
@@ -23,6 +24,33 @@ app = FastAPI(
     description="Backend API para gestión de usuarios y puntuaciones del juego",
 )
 
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=settings.app_name,
+        version=settings.app_version,
+        description="Backend API para gestión de usuarios y puntuaciones del juego",
+        routes=app.routes,
+    )
+
+    openapi_schema["components"]["securitySchemes"] = {
+        "Bearer": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "Token JWT. Obtenlo en POST /auth/login"
+        }
+    }
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,6 +63,7 @@ Base.metadata.create_all(bind=engine)
 
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(inaturalist.router)
 
 
 @app.get("/", tags=["health"])
@@ -52,16 +81,6 @@ async def scalar_html():
         openapi_url=app.openapi_url,
         title=app.title,
     )
-
-
-@app.get("/documentation", tags=["documentation"])
-async def get_documentation():
-    return {
-        "scalar_url": "/scalar",
-        "swagger_url": "/docs",
-        "redoc_url": "/redoc",
-        "openapi_url": "/openapi.json"
-    }
 
 
 if __name__ == "__main__":

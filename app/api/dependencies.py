@@ -9,6 +9,7 @@ from app.domain.repositories.user_repository import UserRepository
 from app.infrastructure.repositories.user_repository_impl import UserRepositoryImpl
 from app.application.services.auth_service import AuthService
 from app.application.services.user_service import UserService
+from app.infrastructure.database.models import UserModel
 
 
 def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
@@ -51,3 +52,42 @@ async def get_current_user(request: Request):
         "role": role,
         "email": payload.get("email")
     }
+
+
+async def get_current_user_model(
+    request: Request,
+    db: Session = Depends(get_db)
+) -> UserModel:
+    """
+    Obtiene el modelo de usuario actual desde el token JWT.
+    """
+    auth_header = request.headers.get("Authorization")
+
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token de autenticación faltante",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    token = auth_header[7:]
+    payload = decode_token(token)
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    user_id = payload.get("sub")
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuario no encontrado",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    return user

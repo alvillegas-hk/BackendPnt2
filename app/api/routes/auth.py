@@ -9,7 +9,7 @@ from app.application.exceptions.exceptions import RateLimitError, Authentication
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED, summary="Registrar nuevo usuario")
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED, summary="Registrar nuevo usuario", description="⭐ Core | Registra un nuevo usuario en el sistema")
 async def register(request: RegisterRequest, auth_service: AuthService = Depends(get_auth_service)):
     try:
         dto = RegisterUserDTO(
@@ -27,7 +27,7 @@ async def register(request: RegisterRequest, auth_service: AuthService = Depends
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(e))
 
 
-@router.post("/login", response_model=AuthResponse, summary="Iniciar sesión")
+@router.post("/login", response_model=AuthResponse, summary="Iniciar sesión", description="⭐ Core | Genera token JWT para autenticarse")
 async def login(request: LoginRequest, auth_service: AuthService = Depends(get_auth_service)):
     try:
         return auth_service.login(request.email, request.password)
@@ -39,7 +39,7 @@ async def login(request: LoginRequest, auth_service: AuthService = Depends(get_a
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(e))
 
 
-@router.post("/refresh", response_model=AuthResponse, summary="Refrescar token de acceso")
+@router.post("/refresh", response_model=AuthResponse, summary="Refrescar token de acceso", description="🔐 Protegido | Renueva el token JWT expirado")
 async def refresh(request: RefreshTokenRequest, auth_service: AuthService = Depends(get_auth_service)):
     try:
         return auth_service.refresh_access_token(request.refresh_token)

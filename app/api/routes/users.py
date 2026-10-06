@@ -8,7 +8,7 @@ from app.application.exceptions.exceptions import UserNotFoundError, Authorizati
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.get("/me", response_model=UserResponse, summary="Obtener perfil del usuario actual")
+@router.get("/me", response_model=UserResponse, summary="Obtener perfil del usuario actual", description="🔐 Protegido | Retorna los datos del usuario autenticado")
 async def get_profile(current_user: dict = Depends(get_current_user), user_service: UserService = Depends(get_user_service)):
     try:
         return user_service.get_user_profile(current_user["user_id"])
@@ -16,7 +16,7 @@ async def get_profile(current_user: dict = Depends(get_current_user), user_servi
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
-@router.patch("/me/password", response_model=MessageResponse, summary="Cambiar contraseña del usuario actual")
+@router.patch("/me/password", response_model=MessageResponse, summary="Cambiar contraseña del usuario actual", description="🔐 Protegido | Actualiza la contraseña del usuario autenticado")
 async def change_password(
     request: ChangePasswordRequest,
     current_user: dict = Depends(get_current_user),
@@ -34,7 +34,7 @@ async def change_password(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.get("", response_model=PaginatedUsersResponse, summary="Listar usuarios (moderadores y admins)")
+@router.get("", response_model=PaginatedUsersResponse, summary="Listar usuarios (moderadores y admins)", description="🔐 Protegido | Solo mods/admins - Lista de usuarios del sistema")
 async def list_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
@@ -55,7 +55,7 @@ async def list_users(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
-@router.get("/{user_id}", response_model=UserResponse, summary="Obtener datos de un usuario")
+@router.get("/{user_id}", response_model=UserResponse, summary="Obtener datos de un usuario", description="🔐 Protegido | Retorna información pública de un usuario específico")
 async def get_user(
     user_id: str,
     current_user: dict = Depends(get_current_user),
