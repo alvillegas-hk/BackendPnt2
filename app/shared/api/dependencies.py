@@ -24,17 +24,29 @@ def get_user_service(repo: UserRepository = Depends(get_user_repository)) -> Use
     return UserService(repo)
 
 
-async def get_current_user(request: Request):
+def get_token_from_request(request: Request) -> str:
+    """
+    Obtiene el access token: primero del header Authorization (clientes REST/móvil),
+    y si no viene, de la cookie HttpOnly (navegador).
+    """
     auth_header = request.headers.get("Authorization")
 
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token de autenticación faltante",
-            headers={"WWW-Authenticate": "Bearer"}
-        )
+    if auth_header and auth_header.startswith("Bearer "):
+        return auth_header[7:]
 
-    token = auth_header[7:]
+    cookie_token = request.cookies.get("access_token")
+    if cookie_token:
+        return cookie_token
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Token de autenticación faltante",
+        headers={"WWW-Authenticate": "Bearer"}
+    )
+
+
+async def get_current_user(request: Request):
+    token = get_token_from_request(request)
     payload = decode_token(token)
 
     if not payload or "sub" not in payload:
@@ -61,16 +73,7 @@ async def get_current_user_model(
     """
     Obtiene el modelo de usuario actual desde el token JWT.
     """
-    auth_header = request.headers.get("Authorization")
-
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token de autenticación faltante",
-            headers={"WWW-Authenticate": "Bearer"}
-        )
-
-    token = auth_header[7:]
+    token = get_token_from_request(request)
     payload = decode_token(token)
 
     if not payload or "sub" not in payload:

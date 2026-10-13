@@ -145,3 +145,18 @@ async def refresh(request: RefreshTokenRequest, auth_service: AuthService = Depe
 
     except AuthenticationError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+
+@router.post("/logout", summary="Cerrar sesión", description="⭐ Core | Elimina las cookies de autenticación")
+async def logout():
+    response = JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"mensaje": "Sesión cerrada exitosamente"}
+    )
+
+    # Borrar cookies con los mismos atributos con los que se crearon
+    response.delete_cookie(key="access_token", **COOKIE_CONFIG)
+    response.delete_cookie(key="refresh_token", **COOKIE_CONFIG)
+
+    logger.info("Sesión cerrada")
+    return response
