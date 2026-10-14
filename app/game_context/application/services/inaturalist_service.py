@@ -49,6 +49,12 @@ class GameAveResponse(BaseModel):
     ave: GameAveQuestion
 
 
+class GamePreguntasResponse(BaseModel):
+    """Respuesta con un lote de preguntas del juego"""
+    total: int
+    preguntas: List[GameAveQuestion]
+
+
 class BirdObservation(BaseModel):
     """Modelo para una observación de ave (formato iNaturalist)"""
     id: int
@@ -177,6 +183,24 @@ class INaturalistService:
             atribucion=ave_correcta.atribucion,
             opciones=opciones
         )
+
+    @staticmethod
+    def generar_preguntas_juego(todas_aves: List[Ave], cantidad: int = 10) -> List[GameAveQuestion]:
+        """
+        Genera un lote de preguntas distintas a partir de un único listado de aves.
+
+        Args:
+            todas_aves: Aves disponibles (también se usan para las opciones falsas)
+            cantidad: Cantidad de preguntas a generar
+
+        Returns:
+            Lista de GameAveQuestion, cada una con su respuesta correcta y sus opciones
+        """
+        if len(todas_aves) < cantidad:
+            raise ValueError(f"Se necesitan al menos {cantidad} aves y hay {len(todas_aves)}")
+
+        aves_correctas = random.sample(todas_aves, cantidad)
+        return [INaturalistService.generar_pregunta_juego(ave, todas_aves) for ave in aves_correctas]
 
     @staticmethod
     def validar_respuesta(ave_id: int, respuesta_usuario: str, ave_correcta_nombre: str) -> tuple[bool, int]:

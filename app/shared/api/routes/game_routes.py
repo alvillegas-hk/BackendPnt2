@@ -5,7 +5,7 @@ from app.game_context.application.services.inaturalist_service import (
     INaturalistService,
     BirdsResponse,
     AvesResponse,
-    GameAveResponse
+    GamePreguntasResponse
 )
 from app.game_context.application.services.game_result_service import GameResultService
 from app.game_context.application.services.game_session_service import GameSessionService
@@ -144,40 +144,43 @@ async def get_session_stats(
 
 @router.get(
     "/juego/aves",
-    response_model=GameAveResponse,
-    summary="Obtener pregunta del juego",
-    description="⭐ Core | 🔐 Protegido | Retorna una pregunta del juego con 4 opciones (1 correcta + 3 falsas)"
+    response_model=GamePreguntasResponse,
+    summary="Obtener preguntas del juego",
+    description="⭐ Core | 🔐 Protegido | Retorna 10 preguntas del juego, cada una con 4 opciones (1 correcta + 3 falsas)"
 )
 async def get_birds_for_game(
     place_id: int = Query(10434, description="ID del lugar (10434=Buenos Aires, 7190=Argentina)"),
     locale: str = Query("es-AR", description="Idioma/localización"),
     current_user: UserModel = Depends(get_current_user_model),
     db: Session = Depends(get_db)
-) -> GameAveResponse:
+) -> GamePreguntasResponse:
     """
-    Obtiene una pregunta del juego con opciones generadas.
+    Obtiene un lote de 10 preguntas del juego, para que el frontend no tenga que pedirlas una por una.
 
     🔐 Requiere autenticación (Bearer token)
 
     Retorna:
-    - id: ID único del taxón
-    - nombre: Nombre común en español (respuesta correcta)
-    - nombreCientifico: Nombre científico
-    - foto: URL de imagen
-    - atribucion: Crédito fotográfico
-    - opciones: Lista de 4 opciones (id, nombre, nombreCientifico)
+    - total: Cantidad de preguntas (10)
+    - preguntas: Lista de preguntas, cada una con:
+        - id: ID único del taxón (respuesta correcta)
+        - nombre: Nombre común en español (respuesta correcta)
+        - nombreCientifico: Nombre científico
+        - foto: URL de imagen
+        - atribucion: Crédito fotográfico
+        - opciones: Lista de 4 opciones (id, nombre, nombreCientifico)
 
     Parámetros:
     - **place_id**: 10434 (Buenos Aires) o 7190 (Argentina)
     - **locale**: Idioma de respuesta (es-AR, en-US, etc)
     """
     try:
-        ave_correcta, todas_aves = await INaturalistService.get_birds_for_game(
+        # Una sola consulta a iNaturalist alimenta las 10 preguntas
+        _, todas_aves = await INaturalistService.get_birds_for_game(
             place_id=place_id,
             locale=locale
         )
-        pregunta = INaturalistService.generar_pregunta_juego(ave_correcta, todas_aves)
-        return GameAveResponse(ave=pregunta)
+        preguntas = INaturalistService.generar_preguntas_juego(todas_aves, cantidad=10)
+        return GamePreguntasResponse(total=len(preguntas), preguntas=preguntas)
     except Exception as e:
         logger.error(f"Error obteniendo pregunta del juego: {e}")
         raise HTTPException(
