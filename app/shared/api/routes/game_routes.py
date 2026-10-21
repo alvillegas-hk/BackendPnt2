@@ -17,7 +17,9 @@ from app.game_context.application.dtos.game_dto import (
     JugadorRanking,
     IniciarSesionResponse,
     TerminarSesionResponse,
-    EstadisticasSesionResponse
+    EstadisticasSesionResponse,
+    SesionActivaResponse,
+    RespuestaRegistrada
 )
 from app.analytics_context.application.dtos.metrics_dto import (
     MetricasUsuarioResponse,
@@ -43,16 +45,35 @@ router = APIRouter(
     description="⭐ Core | 🔐 Protegido | Inicia una nueva sesión de juego"
 )
 async def iniciar_juego(
+    place_id: int = Query(10434, description="ID del lugar (10434=Buenos Aires, 7190=Argentina)"),
+    locale: str = Query("es-AR", description="Idioma/localización"),
     current_user: UserModel = Depends(get_current_user_model),
     db: Session = Depends(get_db)
 ) -> IniciarSesionResponse:
     """
     Inicia una nueva sesión de juego para el usuario.
 
-    Cada sesión agrupa múltiples preguntas y guardará la puntuación total al finalizar.
+    Genera el lote de 10 preguntas y lo guarda en la sesión. Las respuestas se validan
+    contra ese lote. Si el usuario tenía sesiones activas, se cierran antes.
     """
     try:
-        session_id = GameSessionService.iniciar_sesion(db, current_user.id)
+        _, todas_aves = await INaturalistService.get_birds_for_game(place_id=place_id, locale=locale)
+        preguntas = INaturalistService.generar_preguntas_juego(todas_aves, cantidad=10)
+    except Exception as e:
+        logger.error(f"Error obteniendo aves para iniciar sesión: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se pudieron obtener las aves de iNaturalist"
+        )
+
+    try:
+        session_id = GameSessionService.iniciar_sesion(
+            db,
+            current_user.id,
+            preguntas=[pregunta.model_dump() for pregunta in preguntas],
+            place_id=place_id,
+            locale=locale
+        )
         return IniciarSesionResponse(
             session_id=session_id,
             mensaje="Sesión iniciada. Comienza a jugar."
@@ -143,6 +164,61 @@ async def get_session_stats(
 
 
 @router.get(
+    "/juego/sesion",
+    response_model=SesionActivaResponse,
+    summary="Obtener sesión activa",
+    description="🔐 Protegido | Devuelve el lote, las respuestas y el estado de la sesión activa para retomar la partida"
+)
+async def get_sesion_activa(
+    current_user: UserModel = Depends(get_current_user_model),
+    db: Session = Depends(get_db)
+) -> SesionActivaResponse:
+    """
+    Devuelve la sesión activa del usuario para retomar la partida (por ejemplo, al recargar la página).
+
+    - preguntas: el lote de 10 preguntas guardado en la sesión (mismo formato que /juego/aves)
+    - respuestas: las respuestas dadas, en el orden en que se respondieron
+    - streak_actual y puntos_totales (ya incluye el bonus de racha)
+
+    Responde 404 si no hay sesión activa.
+    """
+    try:
+        sesion_activa = GameSessionService.obtener_sesion_activa(db, current_user.id)
+        if not sesion_activa:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No hay una sesión activa"
+            )
+
+        respuestas = GameSessionService.obtener_respuestas(db, sesion_activa.id)
+
+        return SesionActivaResponse(
+            session_id=sesion_activa.id,
+            preguntas=GameSessionService.obtener_lote(sesion_activa) or [],
+            respuestas=[
+                RespuestaRegistrada(
+                    ave_id=r.ave_id,
+                    respuesta_usuario=r.respuesta_usuario,
+                    es_correcta=r.es_correcta,
+                    puntos_obtenidos=r.puntos_obtenidos,
+                    bonus_racha=r.bonus_racha
+                )
+                for r in respuestas
+            ],
+            streak_actual=sesion_activa.streak_actual,
+            puntos_totales=sum(r.puntos_obtenidos + r.bonus_racha for r in respuestas)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error obteniendo sesión activa: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al obtener la sesión activa"
+        )
+
+
+@router.get(
     "/juego/aves",
     response_model=GamePreguntasResponse,
     summary="Obtener preguntas del juego",
@@ -173,6 +249,12 @@ async def get_birds_for_game(
     - **place_id**: 10434 (Buenos Aires) o 7190 (Argentina)
     - **locale**: Idioma de respuesta (es-AR, en-US, etc)
     """
+    # Si hay sesión activa con lote guardado, devuelve siempre ese mismo lote
+    sesion_activa = GameSessionService.obtener_sesion_activa(db, current_user.id)
+    lote = GameSessionService.obtener_lote(sesion_activa) if sesion_activa else None
+    if lote:
+        return GamePreguntasResponse(total=len(lote), preguntas=lote)
+
     try:
         # Una sola consulta a iNaturalist alimenta las 10 preguntas
         _, todas_aves = await INaturalistService.get_birds_for_game(
@@ -224,11 +306,24 @@ async def validar_respuesta(
                 detail="Ya has respondido esta pregunta en esta sesión"
             )
 
-        # Validar respuesta
+        # El lote guardado en la sesión define qué aves son válidas y cuál es la correcta
+        if GameSessionService.obtener_lote(sesion_activa) is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Esta sesión no tiene lote de preguntas. Termínala e inicia una nueva"
+            )
+        pregunta = GameSessionService.obtener_pregunta_del_lote(sesion_activa, request.ave_id)
+        if not pregunta:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El ave no pertenece al lote de la sesión"
+            )
+
+        # Validar respuesta contra el nombre correcto del lote
         es_correcta, puntos = INaturalistService.validar_respuesta(
             request.ave_id,
             request.respuesta_usuario,
-            request.ave_nombre
+            pregunta["nombre"]
         )
 
         # Actualizar racha y calcular bonus
@@ -257,7 +352,7 @@ async def validar_respuesta(
             db=db,
             user_id=current_user.id,
             ave_id=request.ave_id,
-            ave_nombre=request.ave_nombre,
+            ave_nombre=pregunta["nombre"],
             respuesta_usuario=request.respuesta_usuario,
             es_correcta=es_correcta,
             puntos_obtenidos=puntos,

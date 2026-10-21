@@ -28,8 +28,26 @@ class IniciarSesionResponse(BaseModel):
 
 class RespuestaJugadorRequest(BaseModel):
     ave_id: int
-    ave_nombre: str
+    # Ya no se usa para validar: el nombre correcto sale del lote guardado en la sesión.
+    # Se acepta opcional para no romper a los clientes que todavía lo envían.
+    ave_nombre: str | None = None
     respuesta_usuario: str
+
+
+class RespuestaRegistrada(BaseModel):
+    ave_id: int
+    respuesta_usuario: str
+    es_correcta: bool
+    puntos_obtenidos: int
+    bonus_racha: int
+
+
+class SesionActivaResponse(BaseModel):
+    session_id: str
+    preguntas: List[GameAveQuestion]
+    respuestas: List[RespuestaRegistrada]
+    streak_actual: int
+    puntos_totales: int
 
 
 class RespuestaJugadorResponse(BaseModel):

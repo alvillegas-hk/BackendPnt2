@@ -4,6 +4,8 @@ import random
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 
+from app.game_context.infrastructure.nombres_argentinos import nombre_argentino
+
 logger = logging.getLogger(__name__)
 
 INATURALIST_API_BASE_URL = "https://api.inaturalist.org/v1"
@@ -138,7 +140,7 @@ class INaturalistService:
                     if default_photo and taxon.get("preferred_common_name"):
                         ave = Ave(
                             id=taxon.get("id"),
-                            nombre=taxon.get("preferred_common_name", "Unknown"),
+                            nombre=nombre_argentino(taxon.get("id"), taxon.get("preferred_common_name", "Unknown")),
                             nombreCientifico=taxon.get("name", "Unknown"),
                             foto=default_photo.get("medium_url", ""),
                             atribucion=default_photo.get("attribution")

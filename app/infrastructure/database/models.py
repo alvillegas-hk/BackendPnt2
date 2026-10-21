@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -70,6 +70,9 @@ class GameSessionModel(Base):
     estado = Column(String(50), nullable=False, default="activa")
     createdAt = Column(Integer, nullable=False)
     terminadaAt = Column(Integer, nullable=True)
+    preguntas = Column(Text, nullable=True)  # Lote de 10 preguntas en JSON, incluye la respuesta correcta
+    place_id = Column(Integer, nullable=True)
+    locale = Column(String(20), nullable=True)
 
     user = relationship("UserModel", back_populates="game_sessions")
     results = relationship("GameResultModel", back_populates="session", cascade="all, delete-orphan")

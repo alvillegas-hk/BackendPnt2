@@ -41,6 +41,23 @@ def cleanup_db():
     yield
 
 
+@pytest.fixture(autouse=True)
+def inaturalist_sin_red(monkeypatch):
+    """/juego/iniciar genera el lote con iNaturalist: se reemplaza por aves fijas para no depender de la red"""
+    from app.game_context.application.services.inaturalist_service import Ave, INaturalistService
+
+    aves = [
+        Ave(id=2000 + i, nombre=f"Ave {i}", nombreCientifico=f"Avis testus {i}", foto="https://example.com/a.jpg")
+        for i in range(15)
+    ]
+
+    async def get_birds_falso(place_id: int = 10434, locale: str = "es-AR"):
+        return aves[0], aves
+
+    monkeypatch.setattr(INaturalistService, "get_birds_for_game", get_birds_falso)
+    yield
+
+
 # ============================================================================
 # AUTH ENDPOINTS TESTS
 # ============================================================================

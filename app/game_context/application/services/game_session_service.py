@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 from ulid import ULID
@@ -13,18 +14,35 @@ class GameSessionService:
     """Servicio para gestionar sesiones de juego"""
 
     @staticmethod
-    def iniciar_sesion(db: Session, user_id: str) -> str:
+    def iniciar_sesion(
+        db: Session,
+        user_id: str,
+        preguntas: list[dict],
+        place_id: int,
+        locale: str
+    ) -> str:
         """
-        Inicia una nueva sesión de juego para un usuario.
+        Inicia una nueva sesión de juego para un usuario con su lote de preguntas.
+        Si el usuario tenía sesiones activas, las cierra antes (guardando su puntuación).
 
         Args:
             db: Sesión de base de datos
             user_id: ID del usuario
+            preguntas: Lote de preguntas (dicts de GameAveQuestion), con la respuesta correcta
+            place_id: ID del lugar con el que se generó el lote
+            locale: Idioma con el que se generó el lote
 
         Returns:
             ID de la sesión iniciada
         """
         try:
+            activas = db.query(GameSessionModel).filter(
+                GameSessionModel.user_id == user_id,
+                GameSessionModel.estado == "activa"
+            ).all()
+            for anterior in activas:
+                GameSessionService.terminar_sesion(db, anterior.id)
+
             session_id = str(ULID())
             timestamp = int(time.time())
 
@@ -37,7 +55,10 @@ class GameSessionService:
                 streak_actual=0,
                 streak_maximo=0,
                 estado="activa",
-                createdAt=timestamp
+                createdAt=timestamp,
+                preguntas=json.dumps(preguntas),
+                place_id=place_id,
+                locale=locale
             )
 
             db.add(sesion)
@@ -72,6 +93,33 @@ class GameSessionService:
         except Exception as e:
             logger.error(f"Error obteniendo sesión activa: {e}")
             raise
+
+    @staticmethod
+    def obtener_lote(sesion: GameSessionModel) -> list[dict] | None:
+        """
+        Devuelve el lote de preguntas guardado en la sesión.
+
+        Returns:
+            Lista de preguntas, o None si la sesión no tiene lote (sesiones creadas antes de guardarlo)
+        """
+        if not sesion.preguntas:
+            return None
+        return json.loads(sesion.preguntas)
+
+    @staticmethod
+    def obtener_pregunta_del_lote(sesion: GameSessionModel, ave_id: int) -> dict | None:
+        """Devuelve la pregunta del lote cuyo id coincide con ave_id, o None si no está en el lote."""
+        for pregunta in GameSessionService.obtener_lote(sesion) or []:
+            if pregunta["id"] == ave_id:
+                return pregunta
+        return None
+
+    @staticmethod
+    def obtener_respuestas(db: Session, session_id: str) -> list[GameResultModel]:
+        """Devuelve las respuestas de la sesión en el orden en que se respondieron."""
+        return db.query(GameResultModel).filter(
+            GameResultModel.session_id == session_id
+        ).order_by(GameResultModel.createdAt, GameResultModel.id).all()
 
     @staticmethod
     def validar_respuesta_unica(db: Session, session_id: str, ave_id: int) -> bool:
