@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
@@ -7,6 +8,7 @@ import logging
 from app.infrastructure.config.settings import get_settings
 from app.shared.infrastructure.database.database import engine
 from app.shared.infrastructure.database.models import Base
+from app.shared.infrastructure.database.seed_users import seed_si_no_existe
 from app.shared.api.routes import auth_routes, users_routes, game_routes
 
 settings = get_settings()
@@ -18,10 +20,18 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    seed_si_no_existe()
+    yield
+
+
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="Backend API para gestión de usuarios y puntuaciones del juego",
+    lifespan=lifespan,
 )
 
 
