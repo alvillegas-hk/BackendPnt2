@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, DateTime, Text
+from sqlalchemy import Column, String, Integer, BigInteger, Boolean, ForeignKey, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -16,9 +16,9 @@ class UserModel(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False, default="jugador")
     is_active = Column(Boolean, nullable=False, default=True)
-    createdAt = Column(Integer, nullable=False)
-    updatedAt = Column(Integer, nullable=False)
-    lastLogin = Column(Integer, nullable=True)
+    createdAt = Column(BigInteger, nullable=False)
+    updatedAt = Column(BigInteger, nullable=False)
+    lastLogin = Column(BigInteger, nullable=True)
 
     scores = relationship("ScoreModel", back_populates="user", cascade="all, delete-orphan")
     game_results = relationship("GameResultModel", back_populates="user", cascade="all, delete-orphan")
@@ -32,8 +32,8 @@ class ScoreModel(Base):
     user_id = Column(String(26), ForeignKey("users.id"), nullable=False, index=True)
     puntos = Column(Integer, nullable=False)
     juego = Column(String(255), nullable=False)
-    fecha = Column(Integer, nullable=False)
-    createdAt = Column(Integer, nullable=False)
+    fecha = Column(BigInteger, nullable=False)
+    createdAt = Column(BigInteger, nullable=False)
 
     user = relationship("UserModel", back_populates="scores")
 
@@ -51,7 +51,7 @@ class GameResultModel(Base):
     puntos_obtenidos = Column(Integer, nullable=False, default=0)
     bonus_racha = Column(Integer, nullable=False, default=0)  # Bonus por racha
     streak_en_respuesta = Column(Integer, nullable=False, default=0)  # Racha al momento de responder
-    createdAt = Column(Integer, nullable=False)
+    createdAt = Column(BigInteger, nullable=False)
 
     user = relationship("UserModel", back_populates="game_results")
     session = relationship("GameSessionModel", back_populates="results")
@@ -68,11 +68,21 @@ class GameSessionModel(Base):
     streak_actual = Column(Integer, nullable=False, default=0)  # Racha de respuestas correctas
     streak_maximo = Column(Integer, nullable=False, default=0)  # Racha máxima en la sesión
     estado = Column(String(50), nullable=False, default="activa")  # activa, terminada
-    createdAt = Column(Integer, nullable=False)
-    terminadaAt = Column(Integer, nullable=True)
+    createdAt = Column(BigInteger, nullable=False)
+    terminadaAt = Column(BigInteger, nullable=True)
     preguntas = Column(Text, nullable=True)  # Lote de 10 preguntas en JSON, incluye la respuesta correcta
     place_id = Column(Integer, nullable=True)
     locale = Column(String(20), nullable=True)
 
     user = relationship("UserModel", back_populates="game_sessions")
     results = relationship("GameResultModel", back_populates="session", cascade="all, delete-orphan")
+
+class UserConnectionLogModel(Base):
+    __tablename__ = "user_connection_logs"
+
+    id = Column(String(26), primary_key=True)
+    user_id = Column(String(26), ForeignKey("users.id"), nullable=False, index=True)
+    tiempo_conectado_ms = Column(Integer, nullable=False)
+    createdAt = Column(BigInteger, nullable=False, index=True)  # epoch en segundos, igual que el resto de las tablas
+
+    user = relationship("UserModel")

@@ -109,6 +109,8 @@ class GameResultService:
                 UserModel.id,
                 UserModel.nombre,
                 UserModel.apellido
+            ).having(
+                func.coalesce(func.sum(GameResultModel.puntos_obtenidos), 0) > 0
             ).order_by(
                 desc("puntos_totales")
             ).limit(limit).all()

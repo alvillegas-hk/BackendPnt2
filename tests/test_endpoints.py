@@ -3,6 +3,8 @@ Comprehensive endpoint tests for Birds Game API.
 Tests all endpoints to verify functionality after refactoring to bounded contexts.
 """
 
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -13,9 +15,13 @@ from app.shared.infrastructure.database.models import Base
 from app.shared.infrastructure.database.database import get_db
 
 
-# Test database setup
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test_api.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+# Test database setup. Las tablas se borran y recrean en cada test:
+# TEST_DATABASE_URL debe apuntar a una base de pruebas, nunca a la de producción.
+SQLALCHEMY_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "sqlite:///./test_api.db")
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {},
+)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base.metadata.create_all(bind=engine)

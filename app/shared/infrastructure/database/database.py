@@ -8,6 +8,7 @@ settings = get_settings()
 engine = create_engine(
     settings.database_url,
     connect_args={"check_same_thread": False} if "sqlite" in settings.database_url else {},
+    pool_pre_ping=True,
     echo=settings.app_debug
 )
 
@@ -19,10 +20,10 @@ Base.metadata.create_all(bind=engine)
 def _agregar_columnas_faltantes(engine) -> None:
     """
     create_all no agrega columnas a tablas existentes. Agrega las columnas
-    nuevas de game_sessions y game_results en SQLite (aditivo). Las columnas
-    NOT NULL llevan DEFAULT 0 porque SQLite lo exige para ALTER ADD COLUMN.
+    nuevas de game_sessions y game_results (aditivo), en SQLite y en PostgreSQL.
+    Las columnas NOT NULL llevan DEFAULT 0 porque SQLite lo exige para ALTER ADD COLUMN.
     """
-    if engine.dialect.name != "sqlite":
+    if engine.dialect.name not in ("sqlite", "postgresql"):
         return
 
     columnas_por_tabla = {
@@ -41,10 +42,14 @@ def _agregar_columnas_faltantes(engine) -> None:
     }
     with engine.begin() as conn:
         for tabla, columnas in columnas_por_tabla.items():
-            existentes = {fila[1] for fila in conn.execute(text(f"PRAGMA table_info({tabla})"))}
-            for nombre, tipo in columnas.items():
-                if nombre not in existentes:
-                    conn.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {nombre} {tipo}"))
+            if engine.dialect.name == "sqlite":
+                existentes = {fila[1] for fila in conn.execute(text(f"PRAGMA table_info({tabla})"))}
+                for nombre, tipo in columnas.items():
+                    if nombre not in existentes:
+                        conn.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {nombre} {tipo}"))
+            else:
+                for nombre, tipo in columnas.items():
+                    conn.execute(text(f"ALTER TABLE {tabla} ADD COLUMN IF NOT EXISTS {nombre} {tipo}"))
 
 
 _agregar_columnas_faltantes(engine)

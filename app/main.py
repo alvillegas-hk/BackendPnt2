@@ -9,7 +9,7 @@ from app.infrastructure.config.settings import get_settings
 from app.shared.infrastructure.database.database import engine
 from app.shared.infrastructure.database.models import Base
 from app.shared.infrastructure.database.seed_users import seed_si_no_existe
-from app.shared.api.routes import auth_routes, users_routes, game_routes
+from app.shared.api.routes import auth_routes, users_routes, game_routes, connection_routes
 
 settings = get_settings()
 
@@ -74,6 +74,7 @@ Base.metadata.create_all(bind=engine)
 app.include_router(auth_routes.router)
 app.include_router(users_routes.router)
 app.include_router(game_routes.router)
+app.include_router(connection_routes.router)
 
 
 @app.get("/", tags=["health"])

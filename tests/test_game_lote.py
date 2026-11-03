@@ -6,6 +6,8 @@ validación de respuestas contra el lote, GET /juego/sesion para retomar la part
 cierre de sesiones previas al iniciar y migración de columnas en SQLite.
 """
 
+import os
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -18,8 +20,12 @@ from app.shared.infrastructure.database.database import _agregar_columnas_faltan
 from app.shared.infrastructure.database.models import Base, GameSessionModel
 
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test_game_lote.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+# TEST_DATABASE_URL debe apuntar a una base de pruebas, nunca a la de producción.
+SQLALCHEMY_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "sqlite:///./test_game_lote.db")
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {},
+)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

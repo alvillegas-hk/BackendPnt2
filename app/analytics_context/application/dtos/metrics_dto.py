@@ -10,6 +10,8 @@ class MetricasUsuarioResponse(BaseModel):
     porcentaje_acierto: float
     puntuacion_total: int
     posicion_ranking: int
+    tiempo_conectado_hoy_seg: int = 0
+    tiempo_conectado_total_seg: int = 0
 
 
 class AveEstadistica(BaseModel):

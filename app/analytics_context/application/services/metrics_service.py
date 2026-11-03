@@ -1,8 +1,12 @@
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.infrastructure.database.models import GameResultModel, UserModel
+from app.shared.infrastructure.database.models import UserConnectionLogModel
 from app.analytics_context.application.dtos import (
     MetricasUsuarioResponse,
     MetricasGlobalResponse,
@@ -10,6 +14,14 @@ from app.analytics_context.application.dtos import (
 )
 
 logger = logging.getLogger(__name__)
+
+ZONA_ARGENTINA = ZoneInfo("America/Argentina/Buenos_Aires")
+
+
+def _inicio_del_dia_argentina() -> int:
+    """Epoch en segundos de las 00:00 de hoy en Buenos Aires."""
+    ahora = datetime.now(ZONA_ARGENTINA)
+    return int(ahora.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
 
 
 class MetricsService:
@@ -61,6 +73,19 @@ class MetricsService:
                     posicion = idx
                     break
 
+            tiempo_total_ms = db.query(
+                func.coalesce(func.sum(UserConnectionLogModel.tiempo_conectado_ms), 0)
+            ).filter(
+                UserConnectionLogModel.user_id == user_id
+            ).scalar() or 0
+
+            tiempo_hoy_ms = db.query(
+                func.coalesce(func.sum(UserConnectionLogModel.tiempo_conectado_ms), 0)
+            ).filter(
+                UserConnectionLogModel.user_id == user_id,
+                UserConnectionLogModel.createdAt >= _inicio_del_dia_argentina()
+            ).scalar() or 0
+
             return MetricasUsuarioResponse(
                 user_id=usuario.id,
                 nombre=usuario.nombre,
@@ -69,7 +94,9 @@ class MetricsService:
                 total_aciertos=total_aciertos,
                 porcentaje_acierto=round(porcentaje_acierto, 2),
                 puntuacion_total=puntuacion_total,
-                posicion_ranking=posicion
+                posicion_ranking=posicion,
+                tiempo_conectado_hoy_seg=tiempo_hoy_ms // 1000,
+                tiempo_conectado_total_seg=tiempo_total_ms // 1000
             )
 
         except Exception as e:

@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
-    database_url: str = "sqlite:///./sqlite.db"
+    # Obligatoria: definir en .env, ej. postgresql+psycopg://usuario:clave@localhost:5432/gamemanager
+    database_url: str
 
     admin_email: str = "alfredo.villegas.hk@gmail.com"
     admin_username: str = "admin"
