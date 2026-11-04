@@ -9,6 +9,7 @@ from app.game_context.application.services.inaturalist_service import (
 )
 from app.game_context.application.services.game_result_service import GameResultService
 from app.game_context.application.services.game_session_service import GameSessionService
+from app.game_context.domain.puntuacion import calcular_puntos
 from app.analytics_context.application.services.metrics_service import MetricsService
 from app.game_context.application.dtos.game_dto import (
     RespuestaJugadorRequest,
@@ -326,23 +327,17 @@ async def validar_respuesta(
             pregunta["nombre"]
         )
 
-        # Actualizar racha y calcular bonus
+        # Actualizar racha y puntaje (regla de calcular_puntos, igual que el frontend).
+        # El bonus de racha queda en 0: la racha ya está incluida en los puntos.
         bonus_racha = 0
         if es_correcta:
             sesion_activa.streak_actual += 1
             if sesion_activa.streak_actual > sesion_activa.streak_maximo:
                 sesion_activa.streak_maximo = sesion_activa.streak_actual
-
-            # Calcular bonus por racha
-            if sesion_activa.streak_actual == 3:
-                bonus_racha = 5
-            elif sesion_activa.streak_actual == 5:
-                bonus_racha = 15
-            elif sesion_activa.streak_actual >= 10:
-                bonus_racha = 50
         else:
             # Resetear racha si falla
             sesion_activa.streak_actual = 0
+        puntos = calcular_puntos(es_correcta, sesion_activa.streak_actual)
 
         # Marcar sesión como modificada (se guarda al guardar resultado)
         db.add(sesion_activa)

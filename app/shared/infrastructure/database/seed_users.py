@@ -15,6 +15,7 @@ import time
 from sqlalchemy import func
 from ulid import ULID
 
+from app.game_context.domain.puntuacion import calcular_puntos
 from app.game_context.infrastructure.nombres_argentinos import NOMBRES_ARGENTINOS
 from app.infrastructure.security.password import hash_password
 from app.shared.infrastructure.database.database import SessionLocal
@@ -32,7 +33,6 @@ CANTIDAD_MODERADORES = 3
 PASSWORD_SEED = "Jugador123"
 DOMINIO = "example.com"
 PREGUNTAS_POR_SESION = 10
-PUNTOS_POR_ACIERTO = 10
 SEED_RANDOM = 42
 
 # Administradores de desarrollo/pruebas. Se crean si no existen (no se modifican los existentes).
@@ -55,17 +55,6 @@ APELLIDOS = [
     "Romero", "Díaz", "Torres", "Álvarez", "Ruiz", "Ramírez", "Flores", "Acosta",
     "Benítez", "Medina", "Herrera", "Suárez", "Aguirre", "Pereyra", "Castro", "Ojeda",
 ]
-
-
-def _bono_racha(streak: int) -> int:
-    """Mismo criterio que la ruta /juego/respuesta."""
-    if streak == 3:
-        return 5
-    if streak == 5:
-        return 15
-    if streak >= 10:
-        return 50
-    return 0
 
 
 def _simular_partida(rng: random.Random, db, user_id: str, precision: float, ahora_ms: int) -> None:
@@ -98,12 +87,11 @@ def _simular_partida(rng: random.Random, db, user_id: str, precision: float, aho
         if es_correcta:
             respuesta = nombre_correcto
             streak += 1
-            puntos = PUNTOS_POR_ACIERTO
         else:
             respuesta = rng.choice([n for n in nombres if n != nombre_correcto])
             streak = 0
-            puntos = 0
-        bonus = _bono_racha(streak) if es_correcta else 0
+        puntos = calcular_puntos(es_correcta, streak)
+        bonus = 0  # El bonus ya está incluido en los puntos (ver calcular_puntos)
 
         db.add(GameResultModel(
             id=str(ULID()),
