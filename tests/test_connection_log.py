@@ -179,3 +179,52 @@ def test_ranking_oculta_jugadores_con_cero_puntos():
     ids = [j["user_id"] for j in r.json()["ranking"]]
     assert ids == [usuario]
     assert r.json()["total_jugadores"] == 1
+
+
+def test_reintento_no_duplica_y_rechaza_cambios(usuario):
+    client.cookies = _cookie_para(usuario)
+    fin = int(time.time() * 1000)
+    body = {"registroId": "reintento", "inicioMs": fin - 5000,
+            "finMs": fin, "tiempoConectado": 5000}
+    assert client.post("/api/user-connection-log", json=body).status_code == 201
+    assert client.post("/api/user-connection-log", json=body).status_code == 201
+    db = TestingSessionLocal()
+    assert db.query(UserConnectionLogModel).count() == 1
+    db.close()
+    body["inicioMs"] -= 1000
+    body["tiempoConectado"] += 1000
+    assert client.post("/api/user-connection-log", json=body).status_code == 409
+
+
+def test_intervalo_cruza_medianoche(usuario, monkeypatch):
+    from zoneinfo import ZoneInfo
+    from app.analytics_context.application.services import metrics_service
+    zona = ZoneInfo("America/Argentina/Buenos_Aires")
+    medianoche = int(datetime(2026, 11, 3, tzinfo=zona).timestamp())
+    class RelojFijo(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime.fromtimestamp(medianoche + 1200, tz)
+    monkeypatch.setattr(metrics_service, "datetime", RelojFijo)
+    monkeypatch.setattr(metrics_service, "_inicio_del_dia_argentina", lambda: medianoche)
+    db = TestingSessionLocal()
+    db.add(UserConnectionLogModel(id="medianoche", user_id=usuario,
+        inicio_ms=(medianoche - 600) * 1000, fin_ms=(medianoche + 600) * 1000,
+        tiempo_conectado_ms=1_200_000, createdAt=medianoche + 600))
+    db.commit()
+    resultado = metrics_service.MetricsService.obtener_metricas_usuario(db, usuario)
+    assert resultado.tiempo_conectado_total_seg == 1200
+    assert resultado.tiempo_conectado_hoy_seg == 600
+    db.close()
+
+
+@pytest.mark.parametrize("cambios", [
+    {"inicioMs": True}, {"finMs": 0}, {"registroId": ""},
+    {"tiempoConectado": 100}, {"finMs": None},
+])
+def test_valida_intervalo(usuario, cambios):
+    client.cookies = _cookie_para(usuario)
+    fin = int(time.time() * 1000)
+    body = {"registroId": "valida", "inicioMs": fin - 5000,
+            "finMs": fin, "tiempoConectado": 5000, **cambios}
+    assert client.post("/api/user-connection-log", json=body).status_code == 422

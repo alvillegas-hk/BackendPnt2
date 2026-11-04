@@ -82,6 +82,8 @@ class UserConnectionLogModel(Base):
 
     id = Column(String(26), primary_key=True)
     user_id = Column(String(26), ForeignKey("users.id"), nullable=False, index=True)
+    inicio_ms = Column(BigInteger, nullable=True)
+    fin_ms = Column(BigInteger, nullable=True)
     tiempo_conectado_ms = Column(Integer, nullable=False)
     createdAt = Column(BigInteger, nullable=False, index=True)  # epoch en segundos, igual que el resto de las tablas
 

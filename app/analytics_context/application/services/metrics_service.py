@@ -3,7 +3,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case
 
 from app.infrastructure.database.models import GameResultModel, UserModel
 from app.shared.infrastructure.database.models import UserConnectionLogModel
@@ -79,11 +79,26 @@ class MetricsService:
                 UserConnectionLogModel.user_id == user_id
             ).scalar() or 0
 
-            tiempo_hoy_ms = db.query(
-                func.coalesce(func.sum(UserConnectionLogModel.tiempo_conectado_ms), 0)
-            ).filter(
-                UserConnectionLogModel.user_id == user_id,
-                UserConnectionLogModel.createdAt >= _inicio_del_dia_argentina()
+            inicio_hoy_ms = _inicio_del_dia_argentina() * 1000
+            ahora_ms = int(datetime.now(ZONA_ARGENTINA).timestamp() * 1000)
+            fin_acotado = case(
+                (UserConnectionLogModel.fin_ms > ahora_ms, ahora_ms),
+                else_=UserConnectionLogModel.fin_ms,
+            )
+            inicio_acotado = case(
+                (UserConnectionLogModel.inicio_ms < inicio_hoy_ms, inicio_hoy_ms),
+                else_=UserConnectionLogModel.inicio_ms,
+            )
+            # Compatibilidad con registros anteriores sin intervalo.
+            aporte = case(
+                (UserConnectionLogModel.inicio_ms.is_(None), case(
+                    (UserConnectionLogModel.createdAt >= inicio_hoy_ms // 1000,
+                     UserConnectionLogModel.tiempo_conectado_ms), else_=0)),
+                (fin_acotado > inicio_acotado, fin_acotado - inicio_acotado),
+                else_=0,
+            )
+            tiempo_hoy_ms = db.query(func.coalesce(func.sum(aporte), 0)).filter(
+                UserConnectionLogModel.user_id == user_id
             ).scalar() or 0
 
             return MetricasUsuarioResponse(

@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker, Session
 from app.infrastructure.config.settings import get_settings
 from app.shared.infrastructure.database.models import Base
@@ -27,6 +27,8 @@ def _agregar_columnas_faltantes(engine) -> None:
         return
 
     columnas_por_tabla = {
+        "user_connection_logs": {"inicio_ms": "BIGINT", "fin_ms": "BIGINT"},
+        "user_connection_logs": {"inicio_ms": "BIGINT", "fin_ms": "BIGINT"},
         "game_sessions": {
             "preguntas": "TEXT",
             "place_id": "INTEGER",
@@ -42,6 +44,8 @@ def _agregar_columnas_faltantes(engine) -> None:
     }
     with engine.begin() as conn:
         for tabla, columnas in columnas_por_tabla.items():
+            if not inspect(conn).has_table(tabla):
+                continue
             if engine.dialect.name == "sqlite":
                 existentes = {fila[1] for fila in conn.execute(text(f"PRAGMA table_info({tabla})"))}
                 for nombre, tipo in columnas.items():
