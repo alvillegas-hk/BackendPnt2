@@ -61,9 +61,12 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
+# Orígenes permitidos: el frontend en Railway y localhost (cualquier puerto) para pruebas.
+# Con allow_credentials=True no se puede usar "*": el navegador rechaza la respuesta.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://frontendpnt2-production.up.railway.app"],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

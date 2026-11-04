@@ -9,11 +9,13 @@ IS_PRODUCTION = ENVIRONMENT == "production"
 
 # Configuración de Cookies HttpOnly
 # HttpOnly siempre True (seguro incluso en desarrollo)
-# Secure y SameSite varían según el ambiente
+# En producción el frontend y el backend están en dominios distintos (sitios cruzados),
+# así que el navegador solo envía la cookie si es SameSite=None y Secure.
+# En desarrollo se usa Lax (localhost es mismo sitio).
 COOKIE_CONFIG = {
     "httponly": True,  # ✅ Siempre seguro
-    "secure": IS_PRODUCTION,  # True en producción, False en desarrollo
-    "samesite": "Strict" if IS_PRODUCTION else "Lax",
+    "secure": IS_PRODUCTION,  # True en producción (requerido por SameSite=None)
+    "samesite": "none" if IS_PRODUCTION else "lax",
     "path": "/"
 }
 
