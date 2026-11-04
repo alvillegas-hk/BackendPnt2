@@ -12,8 +12,8 @@ IS_PRODUCTION = ENVIRONMENT == "production"
 # Secure y SameSite varían según el ambiente
 COOKIE_CONFIG = {
     "httponly": True,  # ✅ Siempre seguro
-    "secure": IS_PRODUCTION,  # True en producción, False en desarrollo
-    "samesite": "Strict" if IS_PRODUCTION else "Lax",
+    "secure": IS_PRODUCTION,  # True en producción (requerido por SameSite=None)
+    "samesite": "none" if IS_PRODUCTION else "lax",  # Frontend y backend son sitios distintos en Railway
     "path": "/"
 }
 
