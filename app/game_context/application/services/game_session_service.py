@@ -175,7 +175,7 @@ class GameSessionService:
 
             total_intentos = len(resultados)
             total_aciertos = sum(1 for r in resultados if r.es_correcta)
-            puntos_totales = sum(r.puntos_obtenidos for r in resultados)
+            puntos_totales = sum(r.puntos_obtenidos + r.bonus_racha for r in resultados)
 
             # Actualizar sesión
             timestamp = int(time.time())

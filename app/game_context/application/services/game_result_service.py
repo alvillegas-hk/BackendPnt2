@@ -100,7 +100,7 @@ class GameResultService:
                 UserModel.id,
                 UserModel.nombre,
                 UserModel.apellido,
-                func.sum(GameResultModel.puntos_obtenidos).label("puntos_totales"),
+                func.sum(GameResultModel.puntos_obtenidos + GameResultModel.bonus_racha).label("puntos_totales"),
                 func.count(GameResultModel.id).label("total_intentos")
             ).outerjoin(
                 GameResultModel,
@@ -110,7 +110,7 @@ class GameResultService:
                 UserModel.nombre,
                 UserModel.apellido
             ).having(
-                func.coalesce(func.sum(GameResultModel.puntos_obtenidos), 0) > 0
+                func.coalesce(func.sum(GameResultModel.puntos_obtenidos + GameResultModel.bonus_racha), 0) > 0
             ).order_by(
                 desc("puntos_totales")
             ).limit(limit).all()
@@ -158,7 +158,7 @@ class GameResultService:
 
             total_intentos = len(resultados)
             aciertos = sum(1 for r in resultados if r.es_correcta)
-            puntos_totales = sum(r.puntos_obtenidos for r in resultados)
+            puntos_totales = sum(r.puntos_obtenidos + r.bonus_racha for r in resultados)
 
             return {
                 "user_id": user_id,

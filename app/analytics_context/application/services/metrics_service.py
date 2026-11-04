@@ -50,21 +50,21 @@ class MetricsService:
 
             total_intentos = len(resultados)
             total_aciertos = sum(1 for r in resultados if r.es_correcta)
-            puntuacion_total = sum(r.puntos_obtenidos for r in resultados)
+            puntuacion_total = sum(r.puntos_obtenidos + r.bonus_racha for r in resultados)
 
             porcentaje_acierto = (total_aciertos / total_intentos * 100) if total_intentos > 0 else 0
 
             # Obtener posición en ranking
             ranking = db.query(
                 UserModel.id,
-                func.sum(GameResultModel.puntos_obtenidos).label("puntos_totales")
+                func.sum(GameResultModel.puntos_obtenidos + GameResultModel.bonus_racha).label("puntos_totales")
             ).outerjoin(
                 GameResultModel,
                 UserModel.id == GameResultModel.user_id
             ).group_by(
                 UserModel.id
             ).order_by(
-                func.sum(GameResultModel.puntos_obtenidos).desc()
+                func.sum(GameResultModel.puntos_obtenidos + GameResultModel.bonus_racha).desc()
             ).all()
 
             posicion = 1

@@ -35,6 +35,15 @@ PREGUNTAS_POR_SESION = 10
 PUNTOS_POR_ACIERTO = 10
 SEED_RANDOM = 42
 
+# Administradores de desarrollo/pruebas. Se crean si no existen (no se modifican los existentes).
+ADMINS_SEED = [
+    "nicolaslealelg@gmail.com",
+    "gaston.sartini@gmail.com",
+    "valentinuzzijoaquin@gmail.com",
+    "alfredo.villegas@gmail.com",
+]
+PASSWORD_ADMINS_SEED = "admin123"
+
 NOMBRES = [
     "Lucía", "Mateo", "Valentina", "Santiago", "Sofía", "Thiago", "Camila", "Benjamín",
     "Martina", "Joaquín", "Emma", "Bautista", "Julieta", "Tomás", "Catalina", "Lautaro",
@@ -113,7 +122,7 @@ def _simular_partida(rng: random.Random, db, user_id: str, precision: float, aho
     db.flush()
     resultados = db.query(GameResultModel).filter(GameResultModel.session_id == session_id).all()
     aciertos = sum(1 for r in resultados if r.es_correcta)
-    puntos_totales = sum(r.puntos_obtenidos for r in resultados)
+    puntos_totales = sum(r.puntos_obtenidos + r.bonus_racha for r in resultados)
     fin = inicio + rng.randint(120, 900)
 
     sesion.puntos_totales = puntos_totales
@@ -179,11 +188,55 @@ def seed_usuarios() -> None:
         db.close()
 
 
+def seed_admins() -> None:
+    """
+    Crea los administradores de ADMINS_SEED que todavía no existan.
+    Es independiente del seed de jugadores para que se ejecute aunque ya estén cargados.
+    No modifica usuarios existentes.
+    """
+    db = SessionLocal()
+    try:
+        existentes = {
+            email for (email,) in db.query(UserModel.email).filter(UserModel.email.in_(ADMINS_SEED)).all()
+        }
+        password_hash = hash_password(PASSWORD_ADMINS_SEED)
+        ahora_ms = int(time.time() * 1000)
+        creados = 0
+
+        for email in ADMINS_SEED:
+            if email in existentes:
+                continue
+            db.add(UserModel(
+                id=str(ULID()),
+                nombre="Admin",
+                apellido=email.split("@")[0],
+                email=email,
+                password_hash=password_hash,
+                role="admin",
+                is_active=True,
+                createdAt=ahora_ms,
+                updatedAt=ahora_ms,
+                lastLogin=None,
+            ))
+            creados += 1
+
+        db.commit()
+        logger.info(f"Seed de admins: {creados} creados")
+    except Exception as e:
+        logger.error(f"Error en seed de admins: {e}")
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 def seed_si_no_existe() -> bool:
     """
     Carga el seed solo si todavía no está cargado. Se llama al iniciar la app.
     Devuelve True si cargó datos en esta ejecución.
     """
+    seed_admins()
+
     db = SessionLocal()
     try:
         cantidad = db.query(func.count(UserModel.id)).filter(
