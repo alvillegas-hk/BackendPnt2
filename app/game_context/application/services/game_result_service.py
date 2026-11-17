@@ -3,9 +3,9 @@ from typing import List
 from ulid import ULID
 import time
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
+from sqlalchemy import case, func
 
-from app.infrastructure.database.models import GameResultModel, UserModel
+from app.shared.infrastructure.database.models import GameResultModel, UserModel
 from app.game_context.domain.entities import GameResult
 
 logger = logging.getLogger(__name__)
@@ -84,60 +84,135 @@ class GameResultService:
             raise
 
     @staticmethod
-    def obtener_ranking(db: Session, limit: int = 10) -> List[dict]:
+    def _consulta_estadisticas_jugadores(db: Session):
+        puntos_totales = func.coalesce(
+            func.sum(GameResultModel.puntos_obtenidos + GameResultModel.bonus_racha),
+            0
+        ).label("puntos_totales")
+        aciertos = func.coalesce(func.sum(
+            case((GameResultModel.es_correcta.is_(True), 1), else_=0)
+        ), 0).label("aciertos")
+
+        return db.query(
+            UserModel.id.label("user_id"),
+            UserModel.nombre.label("nombre"),
+            UserModel.apellido.label("apellido"),
+            puntos_totales,
+            func.count(GameResultModel.id).label("total_intentos"),
+            aciertos
+        ).join(
+            GameResultModel,
+            UserModel.id == GameResultModel.user_id,
+            isouter=True
+        ).group_by(
+            UserModel.id,
+            UserModel.nombre,
+            UserModel.apellido
+        ).subquery()
+
+    @staticmethod
+    def _consulta_ranking(db: Session):
+        agregados = GameResultService._consulta_estadisticas_jugadores(db)
+
+        return db.query(
+            agregados.c.user_id,
+            agregados.c.nombre,
+            agregados.c.apellido,
+            agregados.c.puntos_totales,
+            agregados.c.aciertos,
+            (agregados.c.total_intentos - agregados.c.aciertos).label("fallos"),
+            func.row_number().over(
+                order_by=(agregados.c.puntos_totales.desc(), agregados.c.user_id.asc())
+            ).label("posicion")
+        ).filter(
+            agregados.c.puntos_totales > 0
+        ).subquery()
+
+    @staticmethod
+    def _jugador_desde_fila(fila) -> dict:
+        return {
+            "user_id": fila.user_id,
+            "nombre": fila.nombre,
+            "apellido": fila.apellido,
+            "puntos_totales": fila.puntos_totales,
+            "aciertos": fila.aciertos,
+            "fallos": fila.fallos,
+            "posicion": fila.posicion
+        }
+
+    @staticmethod
+    def obtener_ranking_paginado(
+        db: Session,
+        limit: int = 10,
+        offset: int = 0,
+        user_id: str | None = None
+    ) -> dict:
         """
-        Obtiene el ranking de jugadores ordenado por puntos totales.
+        Obtiene una página del ranking, su total y la fila personal.
 
         Args:
             db: Sesión de base de datos
             limit: Cantidad de jugadores a retornar
+            offset: Cantidad de jugadores a omitir
+            user_id: Usuario para el que se solicita la fila personal
 
         Returns:
-            Lista de jugadores con sus estadísticas
+            Página ordenada, total de participantes y fila personal
         """
         try:
-            resultados = db.query(
-                UserModel.id,
-                UserModel.nombre,
-                UserModel.apellido,
-                func.sum(GameResultModel.puntos_obtenidos + GameResultModel.bonus_racha).label("puntos_totales"),
-                func.count(GameResultModel.id).label("total_intentos")
-            ).outerjoin(
-                GameResultModel,
-                UserModel.id == GameResultModel.user_id
-            ).group_by(
-                UserModel.id,
-                UserModel.nombre,
-                UserModel.apellido
-            ).having(
-                func.coalesce(func.sum(GameResultModel.puntos_obtenidos + GameResultModel.bonus_racha), 0) > 0
-            ).order_by(
-                desc("puntos_totales")
-            ).limit(limit).all()
+            consulta = GameResultService._consulta_ranking(db)
+            filas = db.query(consulta).order_by(
+                consulta.c.posicion
+            ).offset(offset).limit(limit).all()
+            total_jugadores = db.query(func.count(consulta.c.user_id)).scalar() or 0
 
-            ranking = []
-            for r in resultados:
-                aciertos_count = db.query(func.count(GameResultModel.id)).filter(
-                    GameResultModel.user_id == r.id,
-                    GameResultModel.es_correcta == True
-                ).scalar() or 0
+            jugador_actual = None
+            if user_id is not None:
+                jugador_actual = GameResultService.obtener_jugador_ranking(db, user_id)
 
-                total_intentos = r.total_intentos or 0
-
-                ranking.append({
-                    "user_id": r.id,
-                    "nombre": r.nombre,
-                    "apellido": r.apellido,
-                    "puntos_totales": r.puntos_totales or 0,
-                    "aciertos": aciertos_count,
-                    "fallos": total_intentos - aciertos_count
-                })
-
-            return ranking
+            return {
+                "ranking": [GameResultService._jugador_desde_fila(fila) for fila in filas],
+                "total_jugadores": total_jugadores,
+                "jugador_actual": jugador_actual
+            }
 
         except Exception as e:
             logger.error(f"Error obteniendo ranking: {e}")
             raise
+
+    @staticmethod
+    def obtener_ranking(db: Session, limit: int = 10, offset: int = 0) -> List[dict]:
+        """Mantiene la interfaz de lista usada por los consumidores existentes."""
+        return GameResultService.obtener_ranking_paginado(db, limit, offset)["ranking"]
+
+    @staticmethod
+    def obtener_jugador_ranking(db: Session, user_id: str) -> dict | None:
+        """Obtiene estadísticas personales reales y el puesto si participa del ranking."""
+        estadisticas = GameResultService._consulta_estadisticas_jugadores(db)
+        fila_personal = db.query(estadisticas).filter(
+            estadisticas.c.user_id == user_id
+        ).first()
+        if not fila_personal:
+            return None
+
+        jugador = {
+            "user_id": fila_personal.user_id,
+            "nombre": fila_personal.nombre,
+            "apellido": fila_personal.apellido,
+            "puntos_totales": fila_personal.puntos_totales,
+            "aciertos": fila_personal.aciertos,
+            "fallos": fila_personal.total_intentos - fila_personal.aciertos,
+            "posicion": None
+        }
+
+        consulta_ranking = GameResultService._consulta_ranking(db)
+        fila_ranking = db.query(consulta_ranking).filter(
+            consulta_ranking.c.user_id == user_id
+        ).first()
+        if fila_ranking:
+            jugador["posicion"] = fila_ranking.posicion
+
+        return jugador
 
     @staticmethod
     def obtener_estadisticas_usuario(db: Session, user_id: str) -> dict:

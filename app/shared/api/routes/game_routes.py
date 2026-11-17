@@ -391,6 +391,7 @@ async def validar_respuesta(
 )
 async def get_ranking(
     limit: int = Query(10, ge=1, le=100, description="Cantidad de jugadores a mostrar"),
+    offset: int = Query(0, ge=0, description="Cantidad de jugadores a omitir"),
     current_user: UserModel = Depends(get_current_user_model),
     db: Session = Depends(get_db)
 ) -> RankingResponse:
@@ -399,9 +400,15 @@ async def get_ranking(
 
     Parámetros:
     - **limit**: Cantidad de jugadores a retornar (1-100, default 10)
+    - **offset**: Cantidad de jugadores a omitir (default 0)
     """
     try:
-        ranking_data = GameResultService.obtener_ranking(db, limit)
+        resultado = GameResultService.obtener_ranking_paginado(
+            db,
+            limit=limit,
+            offset=offset,
+            user_id=current_user.id
+        )
         ranking_jugadores = [
             JugadorRanking(
                 user_id=r["user_id"],
@@ -409,14 +416,17 @@ async def get_ranking(
                 apellido=r["apellido"],
                 puntos_totales=r["puntos_totales"],
                 aciertos=r["aciertos"],
-                fallos=r["fallos"]
+                fallos=r["fallos"],
+                posicion=r["posicion"]
             )
-            for r in ranking_data
+            for r in resultado["ranking"]
         ]
 
         return RankingResponse(
-            total_jugadores=len(ranking_jugadores),
-            ranking=ranking_jugadores
+            total_jugadores=resultado["total_jugadores"],
+            ranking=ranking_jugadores,
+            jugador_actual=JugadorRanking(**resultado["jugador_actual"])
+            if resultado["jugador_actual"] else None
         )
 
     except Exception as e:

@@ -9,7 +9,7 @@ class MetricasUsuarioResponse(BaseModel):
     total_aciertos: int
     porcentaje_acierto: float
     puntuacion_total: int
-    posicion_ranking: int
+    posicion_ranking: int | None
     tiempo_conectado_hoy_seg: int = 0
     tiempo_conectado_total_seg: int = 0
 

@@ -11,7 +11,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.main import app
-from app.shared.infrastructure.database.models import Base
+from app.shared.infrastructure.database.models import Base, GameResultModel, UserModel
 from app.shared.infrastructure.database.database import get_db
 
 
@@ -308,6 +308,78 @@ class TestGameEndpoints:
         assert "total_jugadores" in data
         assert "ranking" in data
         assert isinstance(data["ranking"], list)
+        assert data["total_jugadores"] == 0
+        assert data["jugador_actual"]["posicion"] is None
+
+    def test_get_ranking_paginated_personal_outside_first_100(self, auth_token):
+        db = TestingSessionLocal()
+        jugador = db.query(UserModel).filter(UserModel.email == "player@example.com").first()
+        for indice in range(101):
+            user_id = f"ranking-{indice:03}"
+            db.add(UserModel(
+                id=user_id,
+                nombre=f"Jugador {indice}",
+                apellido="Ranking",
+                email=f"{user_id}@example.com",
+                password_hash="hash",
+                role="jugador",
+                is_active=True,
+                createdAt=1,
+                updatedAt=1,
+            ))
+            db.add(GameResultModel(
+                id=f"ranking-result-{indice:03}",
+                user_id=user_id,
+                ave_id=indice,
+                ave_nombre="Ave",
+                respuesta_usuario="Ave",
+                es_correcta=True,
+                puntos_obtenidos=101 - indice,
+                bonus_racha=0,
+                streak_en_respuesta=0,
+                createdAt=indice,
+            ))
+        db.add(GameResultModel(
+            id="ranking-result-personal",
+            user_id=jugador.id,
+            ave_id=999,
+            ave_nombre="Ave",
+            respuesta_usuario="Respuesta incorrecta",
+            es_correcta=False,
+            puntos_obtenidos=0,
+            bonus_racha=0,
+            streak_en_respuesta=0,
+            createdAt=999,
+        ))
+        db.commit()
+        db.close()
+
+        primera = client.get(
+            "/api/inaturalist/juego/ranking",
+            headers={"Authorization": f"Bearer {auth_token}"},
+            params={"limit": 10, "offset": 0},
+        ).json()
+        ultima_response = client.get(
+            "/api/inaturalist/juego/ranking",
+            headers={"Authorization": f"Bearer {auth_token}"},
+            params={"limit": 10, "offset": 100},
+        )
+        ultima = ultima_response.json()
+        offset_invalido = client.get(
+            "/api/inaturalist/juego/ranking",
+            headers={"Authorization": f"Bearer {auth_token}"},
+            params={"limit": 10, "offset": -1},
+        )
+
+        assert primera["total_jugadores"] == 101
+        assert [jugador["posicion"] for jugador in primera["ranking"]] == list(range(1, 11))
+        assert ultima_response.status_code == 200
+        assert len(ultima["ranking"]) == 1
+        assert [jugador["posicion"] for jugador in ultima["ranking"]] == [101]
+        assert ultima["jugador_actual"]["posicion"] is None
+        assert ultima["jugador_actual"]["aciertos"] == 0
+        assert ultima["jugador_actual"]["fallos"] == 1
+        assert offset_invalido.status_code == 422
 
 
 # ============================================================================
