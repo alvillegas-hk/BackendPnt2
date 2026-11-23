@@ -5,8 +5,9 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 
-from app.infrastructure.database.models import GameResultModel, UserModel
+from app.shared.infrastructure.database.models import GameResultModel, UserModel
 from app.shared.infrastructure.database.models import UserConnectionLogModel
+from app.game_context.application.services.game_result_service import GameResultService
 from app.analytics_context.application.dtos import (
     MetricasUsuarioResponse,
     MetricasGlobalResponse,
@@ -44,34 +45,15 @@ class MetricsService:
             if not usuario:
                 raise ValueError(f"Usuario {user_id} no encontrado")
 
-            resultados = db.query(GameResultModel).filter(
-                GameResultModel.user_id == user_id
-            ).all()
-
-            total_intentos = len(resultados)
-            total_aciertos = sum(1 for r in resultados if r.es_correcta)
-            puntuacion_total = sum(r.puntos_obtenidos + r.bonus_racha for r in resultados)
+            jugador_ranking = GameResultService.obtener_jugador_ranking(db, user_id)
+            total_intentos = (
+                jugador_ranking["aciertos"] + jugador_ranking["fallos"]
+                if jugador_ranking else 0
+            )
+            total_aciertos = jugador_ranking["aciertos"] if jugador_ranking else 0
+            puntuacion_total = jugador_ranking["puntos_totales"] if jugador_ranking else 0
 
             porcentaje_acierto = (total_aciertos / total_intentos * 100) if total_intentos > 0 else 0
-
-            # Obtener posición en ranking
-            ranking = db.query(
-                UserModel.id,
-                func.sum(GameResultModel.puntos_obtenidos + GameResultModel.bonus_racha).label("puntos_totales")
-            ).outerjoin(
-                GameResultModel,
-                UserModel.id == GameResultModel.user_id
-            ).group_by(
-                UserModel.id
-            ).order_by(
-                func.sum(GameResultModel.puntos_obtenidos + GameResultModel.bonus_racha).desc()
-            ).all()
-
-            posicion = 1
-            for idx, (uid, _) in enumerate(ranking, 1):
-                if uid == user_id:
-                    posicion = idx
-                    break
 
             tiempo_total_ms = db.query(
                 func.coalesce(func.sum(UserConnectionLogModel.tiempo_conectado_ms), 0)
@@ -109,7 +91,7 @@ class MetricsService:
                 total_aciertos=total_aciertos,
                 porcentaje_acierto=round(porcentaje_acierto, 2),
                 puntuacion_total=puntuacion_total,
-                posicion_ranking=posicion,
+                posicion_ranking=jugador_ranking["posicion"] if jugador_ranking else None,
                 tiempo_conectado_hoy_seg=tiempo_hoy_ms // 1000,
                 tiempo_conectado_total_seg=tiempo_total_ms // 1000
             )

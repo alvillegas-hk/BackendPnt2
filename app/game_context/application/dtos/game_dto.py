@@ -81,8 +81,10 @@ class JugadorRanking(BaseModel):
     puntos_totales: int
     aciertos: int
     fallos: int
+    posicion: int | None = None
 
 
 class RankingResponse(BaseModel):
     total_jugadores: int
     ranking: List[JugadorRanking]
+    jugador_actual: JugadorRanking | None = None
