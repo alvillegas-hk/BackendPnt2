@@ -119,6 +119,7 @@ class INaturalistService:
                 "native": "true",
                 "quality_grade": "research",
                 "locale": locale,
+                "preferred_place_id": 7190,  # Argentina: usa el nombre común de acá
                 "per_page": 100,
             }
 
